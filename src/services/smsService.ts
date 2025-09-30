@@ -7,10 +7,15 @@ import { OTPStorageEntry } from './sms/types';
 class SMSService {
   private static instance: SMSService;
   private otpStore = new Map<string, OTPStorageEntry>();
-  private provider: SMSProvider;
+  private provider: SMSProvider | null = null;
+  private providerPromise: Promise<SMSProvider>;
 
   private constructor() {
-    // Initialize SMS provider from environment variables
+    // Initialize SMS provider from environment variables asynchronously
+    this.providerPromise = this.initializeProvider();
+  }
+
+  private async initializeProvider(): Promise<SMSProvider> {
     try {
       const validation = SMSProviderFactory.validateEnvConfig();
       if (!validation.valid) {
@@ -18,12 +23,14 @@ class SMSService {
         console.warn('⚠️ Falling back to mock provider');
       }
       
-      this.provider = SMSProviderFactory.createFromEnv();
+      this.provider = await SMSProviderFactory.createFromEnv();
       console.log('✅ SMS Service initialized successfully');
+      return this.provider;
     } catch (error) {
       console.error('❌ Failed to initialize SMS provider:', error);
       console.log('📱 Using mock provider as fallback');
-      this.provider = SMSProviderFactory.createProvider({ provider: 'mock' });
+      this.provider = await SMSProviderFactory.createProvider({ provider: 'mock' });
+      return this.provider;
     }
   }
 
@@ -47,6 +54,9 @@ class SMSService {
    * @returns Promise with success status and message
    */
   async sendOTP(phoneNumber: string): Promise<{ success: boolean; message: string; messageId?: string }> {
+    // Wait for provider to be initialized
+    const provider = await this.providerPromise;
+    
     const otp = this.generateOTP();
     const now = Date.now();
     const expires = now + 5 * 60 * 1000; // 5 minutes
@@ -61,7 +71,7 @@ class SMSService {
 
     try {
       // Use the configured provider to send SMS
-      const result = await this.provider.sendOTP(phoneNumber, otp);
+      const result = await provider.sendOTP(phoneNumber, otp);
       
       if (!result.success) {
         // If sending failed, clean up the stored OTP
@@ -141,8 +151,9 @@ class SMSService {
   /**
    * Gets the current SMS provider (useful for debugging)
    */
-  getProviderInfo(): string {
-    return this.provider.constructor.name;
+  async getProviderInfo(): Promise<string> {
+    const provider = await this.providerPromise;
+    return provider.constructor.name;
   }
 
   /**

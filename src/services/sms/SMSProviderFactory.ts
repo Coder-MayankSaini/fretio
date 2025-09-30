@@ -1,5 +1,4 @@
 import { SMSProvider, SMSProviderConfig } from './types';
-import { TwilioProvider } from './providers/TwilioProvider';
 import { MockProvider } from './providers/MockProvider';
 
 /**
@@ -12,9 +11,11 @@ export class SMSProviderFactory {
    * @returns SMSProvider instance
    * @throws Error if provider type is not supported or configuration is invalid
    */
-  static createProvider(config: SMSProviderConfig): SMSProvider {
+  static async createProvider(config: SMSProviderConfig): Promise<SMSProvider> {
     switch (config.provider) {
       case 'twilio':
+        // Dynamic import to avoid loading Twilio SDK in browser unless needed
+        const { TwilioProvider } = await import('./providers/TwilioProvider');
         return new TwilioProvider(config);
       
       case 'mock':
@@ -33,7 +34,7 @@ export class SMSProviderFactory {
    * Creates a provider from environment variables
    * @returns SMSProvider instance
    */
-  static createFromEnv(): SMSProvider {
+  static async createFromEnv(): Promise<SMSProvider> {
     const provider = (process.env.VITE_SMS_PROVIDER || 'mock') as SMSProviderConfig['provider'];
     
     const config: SMSProviderConfig = {
