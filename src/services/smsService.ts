@@ -1,9 +1,31 @@
-// SMS Service for OTP verification
-// In production, integrate with Twilio, AWS SNS, or other SMS providers
+// SMS Service for OTP verification with real provider integration
+
+import { SMSProvider } from './sms/types';
+import { SMSProviderFactory } from './sms/SMSProviderFactory';
+import { OTPStorageEntry } from './sms/types';
 
 class SMSService {
   private static instance: SMSService;
-  private otpStore = new Map<string, { otp: string; expires: number; attempts: number }>();
+  private otpStore = new Map<string, OTPStorageEntry>();
+  private provider: SMSProvider;
+
+  private constructor() {
+    // Initialize SMS provider from environment variables
+    try {
+      const validation = SMSProviderFactory.validateEnvConfig();
+      if (!validation.valid) {
+        console.warn('⚠️ SMS Configuration Warning:', validation.error);
+        console.warn('⚠️ Falling back to mock provider');
+      }
+      
+      this.provider = SMSProviderFactory.createFromEnv();
+      console.log('✅ SMS Service initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize SMS provider:', error);
+      console.log('📱 Using mock provider as fallback');
+      this.provider = SMSProviderFactory.createProvider({ provider: 'mock' });
+    }
+  }
 
   static getInstance(): SMSService {
     if (!SMSService.instance) {
@@ -12,34 +34,50 @@ class SMSService {
     return SMSService.instance;
   }
 
-  generateOTP(): string {
+  /**
+   * Generates a 6-digit OTP
+   */
+  private generateOTP(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async sendOTP(phoneNumber: string): Promise<{ success: boolean; message: string }> {
+  /**
+   * Sends an OTP to the specified phone number
+   * @param phoneNumber The phone number to send OTP to
+   * @returns Promise with success status and message
+   */
+  async sendOTP(phoneNumber: string): Promise<{ success: boolean; message: string; messageId?: string }> {
     const otp = this.generateOTP();
-    const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+    const expires = now + 5 * 60 * 1000; // 5 minutes
     
     // Store OTP with expiry and attempt counter
-    this.otpStore.set(phoneNumber, { otp, expires, attempts: 0 });
+    this.otpStore.set(phoneNumber, { 
+      otp, 
+      expires, 
+      attempts: 0,
+      createdAt: now
+    });
 
     try {
-      // Simulate SMS sending delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use the configured provider to send SMS
+      const result = await this.provider.sendOTP(phoneNumber, otp);
       
-      // In development, log the OTP to console
-      console.log(`🔐 OTP for ${phoneNumber}: ${otp}`);
-      
-      // In production, integrate with SMS provider:
-      // await this.sendSMSViaTwilio(phoneNumber, otp);
-      // await this.sendSMSViaAWS(phoneNumber, otp);
+      if (!result.success) {
+        // If sending failed, clean up the stored OTP
+        this.otpStore.delete(phoneNumber);
+      }
       
       return {
-        success: true,
-        message: `OTP sent to ${phoneNumber.slice(-4).padStart(phoneNumber.length, '*')}`
+        success: result.success,
+        message: result.message,
+        messageId: result.messageId
       };
     } catch (error) {
       console.error('SMS sending error:', error);
+      // Clean up on error
+      this.otpStore.delete(phoneNumber);
+      
       return {
         success: false,
         message: 'Failed to send OTP. Please try again.'
@@ -47,6 +85,12 @@ class SMSService {
     }
   }
 
+  /**
+   * Verifies an OTP for a phone number
+   * @param phoneNumber The phone number to verify
+   * @param userOTP The OTP code provided by the user
+   * @returns Promise with success status and message
+   */
   async verifyOTP(phoneNumber: string, userOTP: string): Promise<{ success: boolean; message: string }> {
     const stored = this.otpStore.get(phoneNumber);
     
@@ -66,7 +110,7 @@ class SMSService {
       };
     }
 
-    // Check attempt limit
+    // Check attempt limit (max 3 attempts)
     if (stored.attempts >= 3) {
       this.otpStore.delete(phoneNumber);
       return {
@@ -94,23 +138,32 @@ class SMSService {
     }
   }
 
-  // Placeholder for Twilio integration
-  private async sendSMSViaTwilio(phoneNumber: string, otp: string): Promise<void> {
-    // const client = twilio(accountSid, authToken);
-    // await client.messages.create({
-    //   body: `Your Fretio verification code is: ${otp}. Valid for 5 minutes.`,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: phoneNumber
-    // });
+  /**
+   * Gets the current SMS provider (useful for debugging)
+   */
+  getProviderInfo(): string {
+    return this.provider.constructor.name;
   }
 
-  // Placeholder for AWS SNS integration
-  private async sendSMSViaAWS(phoneNumber: string, otp: string): Promise<void> {
-    // const sns = new AWS.SNS();
-    // await sns.publish({
-    //   Message: `Your Fretio verification code is: ${otp}. Valid for 5 minutes.`,
-    //   PhoneNumber: phoneNumber
-    // }).promise();
+  /**
+   * Clears expired OTPs from storage (cleanup utility)
+   */
+  clearExpiredOTPs(): number {
+    const now = Date.now();
+    let cleared = 0;
+    
+    for (const [phoneNumber, entry] of this.otpStore.entries()) {
+      if (now > entry.expires) {
+        this.otpStore.delete(phoneNumber);
+        cleared++;
+      }
+    }
+    
+    if (cleared > 0) {
+      console.log(`🧹 Cleared ${cleared} expired OTP(s)`);
+    }
+    
+    return cleared;
   }
 }
 

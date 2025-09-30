@@ -18,6 +18,7 @@ import Messages from "./pages/Messages";
 import Reviews from "./pages/Reviews";
 import Favorites from "./pages/Favorites";
 import Notifications from "./pages/Notifications";
+import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,11 @@ const App = () => (
             <Route path="/marketplace" element={
               <ProtectedRoute requireVerified>
                 <Marketplace />
+              </ProtectedRoute>
+            } />
+            <Route path="/product/:id" element={
+              <ProtectedRoute requireVerified>
+                <ProductDetail />
               </ProtectedRoute>
             } />
             <Route path="/create-product" element={

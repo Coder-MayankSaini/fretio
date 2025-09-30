@@ -124,13 +124,17 @@ const ProductCard = ({
       });
     }
   };
+  const handleCardClick = () => {
+    navigate(`/product/${id}`);
+  };
+
   return (
     <div className={cn(
-      "group bg-card rounded-xl border shadow-fretio-sm hover:shadow-fretio-lg transition-all duration-200 overflow-hidden",
+      "group bg-card rounded-xl border shadow-fretio-sm hover:shadow-fretio-lg transition-all duration-200 overflow-hidden cursor-pointer",
       className
     )}>
       {/* Image Section */}
-      <div className="relative aspect-square overflow-hidden">
+      <div className="relative aspect-square overflow-hidden" onClick={handleCardClick}>
         <img 
           src={images[0] || "/placeholder.svg"}
           alt={title}
@@ -159,7 +163,7 @@ const ProductCard = ({
       </div>
 
       {/* Content Section */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3" onClick={handleCardClick}>
         {/* Category & Condition */}
         <div className="flex items-center justify-between">
           <Badge variant="secondary" className="text-xs">
@@ -212,7 +216,10 @@ const ProductCard = ({
         <Button 
           variant="outline" 
           className="w-full group/btn hover:bg-primary hover:text-primary-foreground"
-          onClick={handleMessageSeller}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleMessageSeller();
+          }}
         >
           <MessageCircle className="w-4 h-4 mr-2 group-hover/btn:animate-pulse" />
           Message Seller
