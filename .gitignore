@@ -16,6 +16,16 @@ dist-ssr
 .env
 .env.local
 
+# Supabase temporary files
+supabase/.temp/
+
+# Lock files (keep only package-lock.json)
+bun.lockb
+yarn.lock
+
+# Debugging and deployment docs (temporary)
+DEBUGGING_NETLIFY.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
