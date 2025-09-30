@@ -35,18 +35,18 @@ export class SMSProviderFactory {
    * @returns SMSProvider instance
    */
   static async createFromEnv(): Promise<SMSProvider> {
-    const provider = (process.env.VITE_SMS_PROVIDER || 'mock') as SMSProviderConfig['provider'];
+    const provider = (import.meta.env.VITE_SMS_PROVIDER || 'mock') as SMSProviderConfig['provider'];
     
     const config: SMSProviderConfig = {
       provider,
       // Twilio configuration
-      accountSid: process.env.VITE_TWILIO_ACCOUNT_SID,
-      authToken: process.env.VITE_TWILIO_AUTH_TOKEN,
-      fromNumber: process.env.VITE_TWILIO_PHONE_NUMBER,
+      accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID,
+      authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN,
+      fromNumber: import.meta.env.VITE_TWILIO_PHONE_NUMBER,
       // AWS SNS configuration (for future use)
-      awsRegion: process.env.VITE_AWS_REGION,
-      awsAccessKeyId: process.env.VITE_AWS_ACCESS_KEY_ID,
-      awsSecretAccessKey: process.env.VITE_AWS_SECRET_ACCESS_KEY,
+      awsRegion: import.meta.env.VITE_AWS_REGION,
+      awsAccessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+      awsSecretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
     };
 
     return this.createProvider(config);
@@ -57,15 +57,19 @@ export class SMSProviderFactory {
    * @returns Object with validation status and error message if any
    */
   static validateEnvConfig(): { valid: boolean; error?: string } {
-    const provider = process.env.VITE_SMS_PROVIDER || 'mock';
+    const provider = import.meta.env.VITE_SMS_PROVIDER || 'mock';
 
     if (provider === 'mock') {
       return { valid: true };
     }
 
     if (provider === 'twilio') {
-      const required = ['VITE_TWILIO_ACCOUNT_SID', 'VITE_TWILIO_AUTH_TOKEN', 'VITE_TWILIO_PHONE_NUMBER'];
-      const missing = required.filter(key => !process.env[key]);
+      const required = [
+        { key: 'VITE_TWILIO_ACCOUNT_SID', value: import.meta.env.VITE_TWILIO_ACCOUNT_SID },
+        { key: 'VITE_TWILIO_AUTH_TOKEN', value: import.meta.env.VITE_TWILIO_AUTH_TOKEN },
+        { key: 'VITE_TWILIO_PHONE_NUMBER', value: import.meta.env.VITE_TWILIO_PHONE_NUMBER }
+      ];
+      const missing = required.filter(item => !item.value).map(item => item.key);
       
       if (missing.length > 0) {
         return {
